@@ -1,4 +1,4 @@
-﻿using Bot.Models;
+using Bot.Models;
 using Newtonsoft.Json;
 using Npgsql;
 using Telegram.Bot;
@@ -75,6 +75,14 @@ class Program
                     else if (message.Text.ToLower() == "місця проведення футбольних матчів" || message.Text.ToLower() == "/venue")
                     {
                         await HandleFootballVenuesCommand(botClient, message);
+                    }
+                    else if (message.Text.ToLower() == "англійська прем'єр ліга, чемпіоншип та ліга 1")
+                    {
+                        await HandlePredictionEnglandInput(botClient, message);
+                    }
+                    else if (message.Text.ToLower() == "українська прем'єр ліга, перша та друга ліги")
+                    {
+                        await HandlePredictionUkraineInput(botClient, message);
                     }
                     else if (userStates.ContainsKey(message.Chat.Id))
                     {
@@ -276,7 +284,9 @@ class Program
             new[]
             {
                 new KeyboardButton[] {"Серія A, B та C"},
-                new KeyboardButton[] {"Ліга 1, 2 та 3"}
+                new KeyboardButton[] {"Ліга 1, 2 та 3"},
+                new KeyboardButton[] {"Англійська Прем'єр Ліга, Чемпіоншип та Ліга 1" },
+                new KeyboardButton[] {"Українська Прем'єр Ліга, Перша та Друга Ліги" }
             }
         )
         {
@@ -379,6 +389,126 @@ class Program
 
                         string insertDataQuery = @"
                         INSERT INTO italyLiga (liga, time, hometeam, awayteam, date) 
+                        VALUES (@liga, @time, @hometeam, @awayteam, @date)
+                        ON CONFLICT (hometeam) DO NOTHING";
+                        using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
+                        {
+                            command.Parameters.AddWithValue("liga", prediction.league_name);
+                            command.Parameters.AddWithValue("time", prediction.match_time);
+                            command.Parameters.AddWithValue("hometeam", prediction.match_hometeam_name);
+                            command.Parameters.AddWithValue("awayteam", prediction.match_awayteam_name);
+                            command.Parameters.AddWithValue("date", prediction.match_date);
+                            command.ExecuteNonQuery();
+                        }
+
+                        connection.Close();
+                    }
+                }
+                await botClient.SendTextMessageAsync(message.Chat, scheduleText);
+                await botClient.SendTextMessageAsync(message.Chat, "Щоб повернутися до головного функціоналу на тискай на\n/ilikefootball");
+            }
+            catch (Exception ex)
+            {
+                await botClient.SendTextMessageAsync(message.Chat, "Сьогодні матчів немає.");
+                Console.WriteLine(ex.ToString());
+            }
+        }
+    }
+    private static async Task HandlePredictionEnglandInput(ITelegramBotClient botClient, Message message)
+    {
+        DateTime today = DateTime.Today;
+        string formattedDate = today.ToString("yyyy-MM-dd");
+        using (var httpClient = new HttpClient())
+        {
+            var url = $"https://localhost:7223/Prediction?from={formattedDate}&to={formattedDate}&country_id=44";
+            try
+            {
+                var response = await httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonConvert.DeserializeObject<List<ModelPrediction>>(responseContent);
+                string scheduleText = "Розклад:\n\n";
+                foreach (var prediction in result)
+                {
+                    scheduleText += $"Ліга : {prediction.league_name}\n";
+                    scheduleText += $"Час : {prediction.match_time}\n";
+                    scheduleText += $"Грають : {prediction.match_hometeam_name} - {prediction.match_awayteam_name} \n";
+                    scheduleText += $"Рахунок : ({prediction.match_hometeam_score}) - ({prediction.match_awayteam_score})\n";
+                    scheduleText += $"Стадіон : {prediction.match_stadium}\n\n";
+                    string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
+
+                    using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+                    {
+                        connection.Open();
+
+                        string createTableQuery = "CREATE TABLE IF NOT EXISTS englandLiga (id SERIAL PRIMARY KEY, liga VARCHAR(50), time VARCHAR(50), hometeam VARCHAR(50) UNIQUE, awayteam VARCHAR(50), date VARCHAR(50))";
+                        using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                        {
+                            command.ExecuteNonQuery();
+                        }
+
+                        string insertDataQuery = @"
+                        INSERT INTO englandLiga (liga, time, hometeam, awayteam, date) 
+                        VALUES (@liga, @time, @hometeam, @awayteam, @date)
+                        ON CONFLICT (hometeam) DO NOTHING";
+                        using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
+                        {
+                            command.Parameters.AddWithValue("liga", prediction.league_name);
+                            command.Parameters.AddWithValue("time", prediction.match_time);
+                            command.Parameters.AddWithValue("hometeam", prediction.match_hometeam_name);
+                            command.Parameters.AddWithValue("awayteam", prediction.match_awayteam_name);
+                            command.Parameters.AddWithValue("date", prediction.match_date);
+                            command.ExecuteNonQuery();
+                        }
+
+                        connection.Close();
+                    }
+                }
+                await botClient.SendTextMessageAsync(message.Chat, scheduleText);
+                await botClient.SendTextMessageAsync(message.Chat, "Щоб повернутися до головного функціоналу на тискай на\n/ilikefootball");
+            }
+            catch (Exception ex)
+            {
+                await botClient.SendTextMessageAsync(message.Chat, "Сьогодні матчів немає.");
+                Console.WriteLine(ex.ToString());
+            }
+        }
+    }
+    private static async Task HandlePredictionUkraineInput(ITelegramBotClient botClient, Message message)
+    {
+        DateTime today = DateTime.Today;
+        string formattedDate = today.ToString("yyyy-MM-dd");
+        using (var httpClient = new HttpClient())
+        {
+            var url = $"https://localhost:7223/Prediction?from={formattedDate}&to={formattedDate}&country_id=112";
+            try
+            {
+                var response = await httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+                var responseContent = await response.Content.ReadAsStringAsync();
+                var result = JsonConvert.DeserializeObject<List<ModelPrediction>>(responseContent);
+                string scheduleText = "Розклад:\n\n";
+                foreach (var prediction in result)
+                {
+                    scheduleText += $"Ліга : {prediction.league_name}\n";
+                    scheduleText += $"Час : {prediction.match_time}\n";
+                    scheduleText += $"Грають : {prediction.match_hometeam_name} - {prediction.match_awayteam_name} \n";
+                    scheduleText += $"Рахунок : ({prediction.match_hometeam_score}) - ({prediction.match_awayteam_score})\n";
+                    scheduleText += $"Стадіон : {prediction.match_stadium}\n\n";
+                    string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
+
+                    using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+                    {
+                        connection.Open();
+
+                        string createTableQuery = "CREATE TABLE IF NOT EXISTS ukraineLiga (id SERIAL PRIMARY KEY, liga VARCHAR(50), time VARCHAR(50), hometeam VARCHAR(50) UNIQUE, awayteam VARCHAR(50), date VARCHAR(50))";
+                        using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                        {
+                            command.ExecuteNonQuery();
+                        }
+
+                        string insertDataQuery = @"
+                        INSERT INTO ukraineLiga (liga, time, hometeam, awayteam, date) 
                         VALUES (@liga, @time, @hometeam, @awayteam, @date)
                         ON CONFLICT (hometeam) DO NOTHING";
                         using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))

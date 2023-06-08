@@ -145,11 +145,6 @@ class Program
         }
     }
 
-    private static Task HandleVoiceMessage(ITelegramBotClient botClient, Message message)
-    {
-        throw new NotImplementedException();
-    }
-
     /*Початок*/
     public static async Task HandleStartCommand(ITelegramBotClient botClient, Message message)
     {
@@ -184,42 +179,57 @@ class Program
         string Name = message.Text;
         var httpClient = new HttpClient();
         var url = $"https://localhost:7223/Coach?Name={Name}";
-        var response = await httpClient.GetAsync(url);
-        response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var result = JsonConvert.DeserializeObject<Coach>(responseContent);
-        if (result.response.Count > 0)
+        try
         {
-            await botClient.SendTextMessageAsync(message.Chat, $"Ім'я : {result.response[0].firstname} {result.response[0].lastname}\nВік : {result.response[0].age}" +
-                $"\nНаціональність : {result.response[0].nationality}\n");
-            await botClient.SendTextMessageAsync(message.Chat, $"{result.response[0].photo}");
-            string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
-
-            using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+            var response = await httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<Coach>(responseContent);
+            if (result.response.Count > 0)
             {
-                connection.Open();
+                await botClient.SendTextMessageAsync(message.Chat, $"Ім'я : {result.response[0].firstname} {result.response[0].lastname}\nВік : {result.response[0].age}" +
+                    $"\nНаціональність : {result.response[0].nationality}\n");
+                await botClient.SendTextMessageAsync(message.Chat, $"{result.response[0].photo}");
+                string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
 
-                string createTableQuery = "CREATE TABLE IF NOT EXISTS coach (id SERIAL PRIMARY KEY, lastname VARCHAR(50) UNIQUE, age VARCHAR(50), nationality VARCHAR(50))";
-                using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
                 {
-                    command.ExecuteNonQuery();
-                }
+                    connection.Open();
 
-                string insertDataQuery = @"
+                    string createTableQuery = "CREATE TABLE IF NOT EXISTS coach (id SERIAL PRIMARY KEY, lastname VARCHAR(50) UNIQUE, age VARCHAR(50), nationality VARCHAR(50))";
+                    using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    string insertDataQuery = @"
                         INSERT INTO coach (lastname,age,nationality) 
                         VALUES (@lastname, @age, @nationality)
                         ON CONFLICT (lastname) DO NOTHING";
-                using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
-                {
-                    command.Parameters.AddWithValue("lastname", result.response[0].lastname);
-                    command.Parameters.AddWithValue("age", result.response[0].age);
-                    command.Parameters.AddWithValue("nationality", result.response[0].nationality);
-                    command.ExecuteNonQuery();
+                    using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("lastname", result.response[0].lastname);
+                        command.Parameters.AddWithValue("age", result.response[0].age);
+                        command.Parameters.AddWithValue("nationality", result.response[0].nationality);
+                        command.ExecuteNonQuery();
+                    }
+                    connection.Close();
                 }
-                connection.Close();
+            }
+            else
+            {
+                await botClient.SendTextMessageAsync(message.Chat, "Тренера не знайдено.");
             }
         }
-        else
+        catch (HttpRequestException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Тренера не знайдено.");
+        }
+        catch (JsonException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Тренера не знайдено.");
+        }
+        catch (Exception)
         {
             await botClient.SendTextMessageAsync(message.Chat, "Тренера не знайдено.");
         }
@@ -236,42 +246,57 @@ class Program
         string Name = message.Text;
         var httpClient = new HttpClient();
         var url = $"https://localhost:7223/Countries?Name={Name}";
-        var response = await httpClient.GetAsync(url);
-        response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var result = JsonConvert.DeserializeObject<Countries>(responseContent);
-        if (result.response.Count > 0)
+        try
         {
-            await botClient.SendTextMessageAsync(message.Chat, $"Країна : {result.response[0].name}");
-            await botClient.SendTextMessageAsync(message.Chat, $"{result.response[0].flag}");
-
-            string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
-
-            using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+            var response = await httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<Countries>(responseContent);
+            if (result.response.Count > 0)
             {
-                connection.Open();
+                await botClient.SendTextMessageAsync(message.Chat, $"Країна : {result.response[0].name}");
+                await botClient.SendTextMessageAsync(message.Chat, $"{result.response[0].flag}");
 
-                string createTableQuery = "CREATE TABLE IF NOT EXISTS country (id SERIAL PRIMARY KEY, name VARCHAR(50) UNIQUE, flag VARCHAR(100))";
-                using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
+
+                using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
                 {
-                    command.ExecuteNonQuery();
-                }
+                    connection.Open();
 
-                string insertDataQuery = @"
+                    string createTableQuery = "CREATE TABLE IF NOT EXISTS country (id SERIAL PRIMARY KEY, name VARCHAR(50) UNIQUE, flag VARCHAR(100))";
+                    using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    string insertDataQuery = @"
                     INSERT INTO country (name, flag) 
                     VALUES (@name, @flag)
                     ON CONFLICT (name) DO NOTHING";
-                using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
-                {
-                    command.Parameters.AddWithValue("name", result.response[0].name);
-                    command.Parameters.AddWithValue("flag", result.response[0].flag);
-                    command.ExecuteNonQuery();
-                }
+                    using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("name", result.response[0].name);
+                        command.Parameters.AddWithValue("flag", result.response[0].flag);
+                        command.ExecuteNonQuery();
+                    }
 
-                connection.Close();
+                    connection.Close();
+                }
+            }
+            else
+            {
+                await botClient.SendTextMessageAsync(message.Chat, "Країну не знайдено.");
             }
         }
-        else
+        catch (HttpRequestException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Країну не знайдено.");
+        }
+        catch (JsonException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Країну не знайдено.");
+        }
+        catch (Exception)
         {
             await botClient.SendTextMessageAsync(message.Chat, "Країну не знайдено.");
         }
@@ -350,6 +375,7 @@ class Program
             catch (Exception ex)
             {
                 await botClient.SendTextMessageAsync(message.Chat, "Сьогодні матчів немає.");
+                await botClient.SendTextMessageAsync(message.Chat, "Щоб повернутися до головного функціоналу на тискай на\n/ilikefootball");
                 Console.WriteLine(ex.ToString());
             }
         }
@@ -381,7 +407,7 @@ class Program
                     {
                         connection.Open();
 
-                        string createTableQuery = "CREATE TABLE IF NOT EXISTS italyLiga (id SERIAL PRIMARY KEY, liga VARCHAR(50), time VARCHAR(50), hometeam VARCHAR(50) UNIQUE, awayteam VARCHAR(50), date VARCHAR(50))";
+                        string createTableQuery = "CREATE TABLE IF NOT EXISTS italyLiga (id SERIAL PRIMARY KEY, liga VARCHAR(100), time VARCHAR(50), hometeam VARCHAR(100) UNIQUE, awayteam VARCHAR(100), date VARCHAR(50))";
                         using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
                         {
                             command.ExecuteNonQuery();
@@ -410,6 +436,7 @@ class Program
             catch (Exception ex)
             {
                 await botClient.SendTextMessageAsync(message.Chat, "Сьогодні матчів немає.");
+                await botClient.SendTextMessageAsync(message.Chat, "Щоб повернутися до головного функціоналу на тискай на\n/ilikefootball");
                 Console.WriteLine(ex.ToString());
             }
         }
@@ -470,6 +497,7 @@ class Program
             catch (Exception ex)
             {
                 await botClient.SendTextMessageAsync(message.Chat, "Сьогодні матчів немає.");
+                await botClient.SendTextMessageAsync(message.Chat, "Щоб повернутися до головного функціоналу на тискай на\n/ilikefootball");
                 Console.WriteLine(ex.ToString());
             }
         }
@@ -530,6 +558,7 @@ class Program
             catch (Exception ex)
             {
                 await botClient.SendTextMessageAsync(message.Chat, "Сьогодні матчів немає.");
+                await botClient.SendTextMessageAsync(message.Chat, "Щоб повернутися до головного функціоналу на тискай на\n/ilikefootball");
                 Console.WriteLine(ex.ToString());
             }
         }
@@ -543,53 +572,70 @@ class Program
     public static async Task HandleInformationInput(ITelegramBotClient botClient, Message message)
     {
         string teamName = message.Text;
-
         var httpClient = new HttpClient();
         var url = $"https://localhost:7223/TeamsInformation?Name={Uri.EscapeDataString(teamName)}";
-        var response = await httpClient.GetAsync(url);
-        response.EnsureSuccessStatusCode();
-        var responseContent = await response.Content.ReadAsStringAsync();
-        var result = JsonConvert.DeserializeObject<TeamInformation>(responseContent);
-        if (result.Response.Length > 0)
+        try
         {
-            await botClient.SendTextMessageAsync(message.Chat, $"Назва : {result.Response[0].Team.Name}\nКраїна : {result.Response[0].Team.Country}\nРік заснування : " +
-                $"{result.Response[0].Team.Founded}");
-            await botClient.SendTextMessageAsync(message.Chat, $"{result.Response[0].Team.Logo}");
-            await botClient.SendTextMessageAsync(message.Chat, $"Домашній стадіон : {result.Response[0].Venue.Name}\nАдреса стадіону : {result.Response[0].Venue.Address}" +
-                $", {result.Response[0].Venue.City}\nКількість сидячих місць : {result.Response[0].Venue.Capacity}");
-            await botClient.SendTextMessageAsync(message.Chat, $"{result.Response[0].Venue.Image}");
-            string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
+            var response = await httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var responseContent = await response.Content.ReadAsStringAsync();
+            var result = JsonConvert.DeserializeObject<TeamInformation>(responseContent);
 
-            using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
+            if (result.Response.Length > 0)
             {
-                connection.Open();
+                await botClient.SendTextMessageAsync(message.Chat, $"Назва : {result.Response[0].Team.Name}\nКраїна : {result.Response[0].Team.Country}\nРік заснування : " +
+                    $"{result.Response[0].Team.Founded}");
+                await botClient.SendTextMessageAsync(message.Chat, $"{result.Response[0].Team.Logo}");
+                await botClient.SendTextMessageAsync(message.Chat, $"Домашній стадіон : {result.Response[0].Venue.Name}\nАдреса стадіону : {result.Response[0].Venue.Address}" +
+                    $", {result.Response[0].Venue.City}\nКількість сидячих місць : {result.Response[0].Venue.Capacity}");
+                await botClient.SendTextMessageAsync(message.Chat, $"{result.Response[0].Venue.Image}");
 
-                string createTableQuery = "CREATE TABLE IF NOT EXISTS team (id SERIAL PRIMARY KEY, name VARCHAR(150) UNIQUE, country VARCHAR(50),founted VARCHAR(5),stadion VARCHAR(50))";
-                using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                string connectionString = "Host=localhost;Username=postgres;Password=root;Database=postgres";
+
+                using (NpgsqlConnection connection = new NpgsqlConnection(connectionString))
                 {
-                    command.ExecuteNonQuery();
-                }
+                    connection.Open();
 
-                string insertDataQuery = @"
+                    string createTableQuery = "CREATE TABLE IF NOT EXISTS team (id SERIAL PRIMARY KEY, name VARCHAR(150) UNIQUE, country VARCHAR(50),founted VARCHAR(5),stadion VARCHAR(50))";
+                    using (NpgsqlCommand command = new NpgsqlCommand(createTableQuery, connection))
+                    {
+                        command.ExecuteNonQuery();
+                    }
+
+                    string insertDataQuery = @"
                     INSERT INTO team (name, country,founted,stadion) 
                     VALUES (@name, @country, @founted, @stadion) 
                     ON CONFLICT (name) DO NOTHING";
-                using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
-                {
-                    command.Parameters.AddWithValue("name", result.Response[0].Team.Name);
-                    command.Parameters.AddWithValue("country", result.Response[0].Team.Country);
-                    command.Parameters.AddWithValue("founted", result.Response[0].Team.Founded);
-                    command.Parameters.AddWithValue("stadion", result.Response[0].Venue.Name);
-                    command.ExecuteNonQuery();
-                }
+                    using (NpgsqlCommand command = new NpgsqlCommand(insertDataQuery, connection))
+                    {
+                        command.Parameters.AddWithValue("name", result.Response[0].Team.Name);
+                        command.Parameters.AddWithValue("country", result.Response[0].Team.Country);
+                        command.Parameters.AddWithValue("founted", result.Response[0].Team.Founded);
+                        command.Parameters.AddWithValue("stadion", result.Response[0].Venue.Name);
+                        command.ExecuteNonQuery();
+                    }
 
-                connection.Close();
+                    connection.Close();
+                }
+            }
+            else
+            {
+                await botClient.SendTextMessageAsync(message.Chat, "Інформацію про футбольну команду не знайдено.");
             }
         }
-        else
+        catch (HttpRequestException)
         {
             await botClient.SendTextMessageAsync(message.Chat, "Інформацію про футбольну команду не знайдено.");
         }
+        catch (JsonException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Інформацію про футбольну команду не знайдено.");
+        }
+        catch (Exception)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Інформацію про футбольну команду не знайдено.");
+        }
+
         userStates.Remove(message.Chat.Id);
     }
     /*Venues*/
@@ -604,6 +650,8 @@ class Program
 
         var httpClient = new HttpClient();
         var url = $"https://localhost:7223/Venues?Name={Uri.EscapeDataString(cityName)}";
+        try 
+        { 
         var response = await httpClient.GetAsync(url);
         response.EnsureSuccessStatusCode();
         var responseContent = await response.Content.ReadAsStringAsync();
@@ -643,6 +691,19 @@ class Program
             }
         }
         else
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Місце проведення футбольних матчів для даного міста не знайдено.");
+        }
+        }
+        catch (HttpRequestException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Місце проведення футбольних матчів для даного міста не знайдено.");
+        }
+        catch (JsonException)
+        {
+            await botClient.SendTextMessageAsync(message.Chat, "Місце проведення футбольних матчів для даного міста не знайдено.");
+        }
+        catch (Exception)
         {
             await botClient.SendTextMessageAsync(message.Chat, "Місце проведення футбольних матчів для даного міста не знайдено.");
         }
